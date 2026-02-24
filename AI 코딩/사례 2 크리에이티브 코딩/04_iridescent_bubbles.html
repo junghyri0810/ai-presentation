@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Iridescent Bubbles 🫧</title>
+  <style>
+    * { margin: 0; padding: 0; }
+    body { overflow: hidden; background: #b8cef0; }
+    canvas { display: block; }
+    #hint {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.55);
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 14px;
+      letter-spacing: 0.07em;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint">클릭으로 버블 생성 · 마우스 오버로 색상 변화 🫧</div>
+<script>
+const cv  = document.getElementById('c');
+const ctx = cv.getContext('2d');
+let W = cv.width  = window.innerWidth;
+let H = cv.height = window.innerHeight;
+
+const mouse = { x: W/2, y: H/2 };
+
+window.addEventListener('resize', () => {
+  W = cv.width  = window.innerWidth;
+  H = cv.height = window.innerHeight;
+});
+window.addEventListener('mousemove', e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+
+// ── 배경 ───────────────────────────────────────────────────
+function drawBG(t) {
+  // 천천히 숨쉬는 하늘 그라디언트
+  const shift = Math.sin(t * .0008) * 15;
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0,   `hsl(${210 + shift}, 55%, 82%)`);
+  g.addColorStop(.4,  `hsl(${220 + shift}, 45%, 78%)`);
+  g.addColorStop(.75, `hsl(${200 + shift}, 50%, 80%)`);
+  g.addColorStop(1,   `hsl(${230 + shift}, 40%, 85%)`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // 부드러운 빛 블럽
+  ctx.save();
+  ctx.globalAlpha = .12;
+  const lg = ctx.createRadialGradient(W*.25, H*.3, 0, W*.25, H*.3, W*.55);
+  lg.addColorStop(0, '#ffffff');
+  lg.addColorStop(1, 'transparent');
+  ctx.fillStyle = lg;
+  ctx.fillRect(0,0,W,H);
+  const lg2 = ctx.createRadialGradient(W*.78, H*.65, 0, W*.78, H*.65, W*.4);
+  lg2.addColorStop(0, 'rgba(200,210,255,1)');
+  lg2.addColorStop(1, 'transparent');
+  ctx.fillStyle = lg2;
+  ctx.fillRect(0,0,W,H);
+  ctx.restore();
+}
+
+// ── 버블 렌더링 ────────────────────────────────────────────
+function drawBubble(x, y, r, hue, alpha, shimmer) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // 바디 (투명 유리)
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  const bg = ctx.createRadialGradient(x - r*.2, y - r*.2, 0, x, y, r);
+  bg.addColorStop(0,   `hsla(${hue}, 60%, 95%, .14)`);
+  bg.addColorStop(.6,  `hsla(${hue}, 55%, 88%, .06)`);
+  bg.addColorStop(1,   `hsla(${hue+20}, 65%, 82%, .1)`);
+  ctx.fillStyle = bg;
+  ctx.fill();
+
+  // 이리데슨트 테두리 (마우스 거리에 따라 shimmer 값 변화)
+  const iridColors = [
+    [hue,            .72],
+    [hue + 50,       .52],
+    [hue + 110,      .40],
+    [hue + 175,      .30],
+    [hue + 240,      .22],
+  ];
+  ctx.save();
+  iridColors.forEach(([h, a], i) => {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.strokeStyle  = `hsla(${(h + shimmer * 40) % 360}, 90%, 80%, ${a})`;
+    ctx.lineWidth    = Math.max(.3, 2.6 - i * .45);
+    ctx.shadowBlur   = i === 0 ? 10 + shimmer * 8 : 0;
+    ctx.shadowColor  = `hsla(${(hue + shimmer * 40) % 360}, 95%, 85%, .6)`;
+    ctx.stroke();
+  });
+  ctx.restore();
+
+  // 내부 반사선 (동심원)
+  for (let i = 1; i <= 3; i++) {
+    ctx.beginPath();
+    ctx.arc(x, y, r * (1 - i * .12), 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(210, 230, 255, ${.18 - i * .04})`;
+    ctx.lineWidth   = .7;
+    ctx.stroke();
+  }
+
+  // 하이라이트 (밝은 빛 반사)
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.clip();
+  const hl = ctx.createRadialGradient(
+    x - r * .32, y - r * .36, 0,
+    x - r * .32, y - r * .36, r * .52
+  );
+  hl.addColorStop(0,   'rgba(255,255,255,.88)');
+  hl.addColorStop(.45, 'rgba(255,255,255,.25)');
+  hl.addColorStop(1,   'rgba(255,255,255,0)');
+  ctx.fillStyle = hl;
+  ctx.fillRect(x - r*2, y - r*2, r*4, r*4);
+
+  // 하단 소형 반사
+  ctx.beginPath();
+  ctx.ellipse(x + r*.2, y + r*.55, r*.16, r*.06, -.2, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,.4)';
+  ctx.fill();
+
+  // 프리즘 반사 (마우스 근처에서 강해짐)
+  if (shimmer > .3) {
+    const prismGrad = ctx.createRadialGradient(x + r*.1, y - r*.1, 0, x, y, r*.8);
+    prismGrad.addColorStop(0, `hsla(${(hue+160+shimmer*60)%360}, 90%, 85%, ${shimmer * .25})`);
+    prismGrad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = prismGrad;
+    ctx.fillRect(x - r*2, y - r*2, r*4, r*4);
+  }
+  ctx.restore();
+
+  ctx.restore();
+}
+
+// ── 스파클 ─────────────────────────────────────────────────
+class Sparkle {
+  constructor(x, y) {
+    this.x   = x ?? Math.random() * W;
+    this.y   = y ?? Math.random() * H;
+    this.s   = Math.random() * 9 + 3;
+    this.t   = 0;
+    this.max = Math.random() * 70 + 35;
+    this.rot = Math.random() * Math.PI * .5;
+    this.hue = Math.random() * 80 + 180;
+  }
+  update() { this.t++; }
+  draw() {
+    const a = Math.sin((this.t / this.max) * Math.PI);
+    if (a <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = a * .85;
+    ctx.strokeStyle = `hsl(${this.hue}, 70%, 90%)`;
+    ctx.lineWidth   = 1.4;
+    ctx.shadowBlur  = 5;
+    ctx.shadowColor = `hsla(${this.hue}, 80%, 85%, .8)`;
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rot);
+    const s = this.s;
+    [[1,0],[0,1],[-1,0],[0,-1]].forEach(([dx,dy]) => {
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(dx*s, dy*s); ctx.stroke();
+    });
+    ctx.globalAlpha = a * .4;
+    ctx.lineWidth   = .7;
+    const d = s * .5, sq = Math.SQRT2;
+    [[1,1],[-1,1],[-1,-1],[1,-1]].forEach(([dx,dy]) => {
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(dx*d/sq, dy*d/sq); ctx.stroke();
+    });
+    ctx.restore();
+  }
+  isDead() { return this.t >= this.max; }
+}
+
+// ── 버블 클래스 ────────────────────────────────────────────
+class Bubble {
+  constructor(x, y) {
+    this.x     = x ?? Math.random() * W;
+    this.y     = y ?? H + 60;
+    this.r     = Math.random() * 55 + 18;
+    this.hue   = Math.random() * 80 + 185;
+    this.vx    = (Math.random() - .5) * .6;
+    this.vy    = -(Math.random() * .9 + .3);
+    this.wo    = Math.random() * Math.PI * 2;
+    this.ws    = Math.random() * .018 + .006;
+    this.alpha = 0;
+    this.tgt   = Math.random() * .2 + .65;
+    this.hueShift = 0;
+  }
+
+  update() {
+    this.wo += this.ws;
+    this.x  += this.vx + Math.sin(this.wo) * .4;
+    this.y  += this.vy;
+
+    // 마우스 근처에서 색상 변화
+    const dx = mouse.x - this.x;
+    const dy = mouse.y - this.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    this.shimmer = Math.max(0, 1 - dist / 220);
+
+    // 마우스에 살짝 밀려남
+    if (dist < 120) {
+      const force = (120 - dist) / 120 * .4;
+      this.vx -= (dx / dist) * force;
+      this.vy -= (dy / dist) * force;
+    }
+
+    this.vx *= .98;
+    this.vy  = this.vy * .999 - .003; // 약한 가속 유지
+
+    if (this.alpha < this.tgt) this.alpha = Math.min(this.alpha + .015, this.tgt);
+  }
+
+  draw() {
+    drawBubble(this.x, this.y, this.r, this.hue, this.alpha, this.shimmer ?? 0);
+  }
+
+  isOff() { return this.y < -this.r * 3; }
+}
+
+// ── 팝 애니메이션 ──────────────────────────────────────────
+class PopRing {
+  constructor(x, y, r, hue) {
+    this.x = x; this.y = y;
+    this.r = r; this.hue = hue;
+    this.t = 0; this.max = 30;
+  }
+  update() { this.t++; }
+  draw() {
+    const progress = this.t / this.max;
+    const cr = this.r * (1 + progress * .8);
+    const a  = 1 - progress;
+    ctx.save();
+    ctx.globalAlpha = a * .7;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, cr, 0, Math.PI * 2);
+    ctx.strokeStyle = `hsla(${this.hue}, 85%, 82%, 1)`;
+    ctx.lineWidth   = (1 - progress) * 3;
+    ctx.stroke();
+    // 작은 물방울 조각들
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2 + progress * Math.PI;
+      const dist  = this.r * (.8 + progress * 1.2);
+      ctx.save();
+      ctx.globalAlpha = a * .6;
+      ctx.beginPath();
+      ctx.arc(
+        this.x + Math.cos(angle) * dist,
+        this.y + Math.sin(angle) * dist,
+        Math.max(0, (1 - progress) * 4), 0, Math.PI * 2
+      );
+      ctx.fillStyle = `hsla(${(this.hue + i*30) % 360}, 80%, 85%, 1)`;
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+  isDead() { return this.t >= this.max; }
+}
+
+// ── 초기화 & 이벤트 ────────────────────────────────────────
+let bubbles  = [];
+let sparks   = [];
+let popRings = [];
+let frame    = 0;
+
+// 초기 버블 배치
+for (let i = 0; i < 18; i++) {
+  const b = new Bubble(Math.random() * W, Math.random() * H * .9);
+  b.alpha = b.tgt;
+  bubbles.push(b);
+}
+
+// 주변 스파클
+for (let i = 0; i < 12; i++) {
+  const s = new Sparkle();
+  s.t = Math.floor(Math.random() * s.max);
+  sparks.push(s);
+}
+
+// 클릭: 버블 생성 또는 터뜨리기
+cv.addEventListener('click', e => {
+  // 클릭 위치의 버블 터뜨리기 체크
+  let popped = false;
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    const b  = bubbles[i];
+    const dx = e.clientX - b.x;
+    const dy = e.clientY - b.y;
+    if (Math.sqrt(dx*dx + dy*dy) < b.r) {
+      popRings.push(new PopRing(b.x, b.y, b.r, b.hue));
+      for (let j = 0; j < 5; j++) {
+        sparks.push(new Sparkle(
+          b.x + (Math.random()-.5)*b.r*2,
+          b.y + (Math.random()-.5)*b.r*2
+        ));
+      }
+      bubbles.splice(i, 1);
+      popped = true;
+      break;
+    }
+  }
+  // 빈 곳 클릭: 새 버블 생성
+  if (!popped) {
+    for (let i = 0; i < 4; i++) {
+      bubbles.push(new Bubble(
+        e.clientX + (Math.random()-.5)*80,
+        e.clientY + (Math.random()-.5)*80
+      ));
+    }
+    for (let i = 0; i < 4; i++) {
+      sparks.push(new Sparkle(
+        e.clientX + (Math.random()-.5)*60,
+        e.clientY + (Math.random()-.5)*60
+      ));
+    }
+  }
+});
+
+// ── 메인 루프 ───────────────────────────────────────────────
+function loop(ts) {
+  frame++;
+  drawBG(ts);
+
+  // 자동 버블 생성
+  if (frame % 90 === 0 && bubbles.length < 25) bubbles.push(new Bubble());
+  // 주변 스파클
+  if (frame % 22 === 0) sparks.push(new Sparkle());
+
+  // 버블 (크기 순 정렬 → 큰 것 뒤)
+  bubbles = bubbles.filter(b => !b.isOff());
+  bubbles.sort((a,b) => b.r - a.r);
+  bubbles.forEach(b => { b.update(); b.draw(); });
+
+  // 팝 링
+  popRings = popRings.filter(p => !p.isDead());
+  popRings.forEach(p => { p.update(); p.draw(); });
+
+  // 스파클
+  sparks = sparks.filter(s => !s.isDead());
+  sparks.forEach(s => { s.update(); s.draw(); });
+
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
