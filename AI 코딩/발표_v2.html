@@ -764,6 +764,115 @@
   .pulse { animation: pulse 2s ease infinite; }
 
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     MOBILE RESPONSIVE
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+  @media (max-width: 768px) {
+
+    /* 슬라이드 기본 패딩 & 스크롤 — 가운데 정렬 */
+    .slide {
+      padding: 40px 20px 100px !important;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      justify-content: center;
+    }
+
+    /* iframe 슬라이드: iframe 숨기고 설명 패널만 표시 */
+    #slide-5, #slide-8, #slide-14, #slide-15 {
+      flex-direction: column !important;
+      align-items: center !important;
+      overflow-y: auto !important;
+      justify-content: center !important;
+    }
+
+    /* 콘텐츠 많은 슬라이드는 위 맞춤 유지 */
+    #slide-7 { justify-content: flex-start !important; }
+
+    .iframe-panel-left {
+      flex: none !important;
+      width: 100% !important;
+      padding: 36px 20px 32px !important;
+      border-right: none !important;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      overflow-y: visible !important;
+    }
+
+    .iframe-panel-right {
+      display: none !important;
+    }
+
+    /* 그리드 → 1열 */
+    .agenda-grid,
+    .compare-grid,
+    .insight-grid,
+    .missing-grid,
+    .creative-grid {
+      grid-template-columns: 1fr !important;
+      gap: 12px !important;
+    }
+
+    .creative-grid-2 {
+      grid-template-columns: 1fr 1fr !important;
+      gap: 10px !important;
+    }
+
+    .ref-images {
+      grid-template-columns: 1fr 1fr !important;
+      gap: 8px !important;
+    }
+
+    /* flex row → column */
+    .resolution-visual,
+    .case-intro,
+    .tool-showcase,
+    .ref-layout {
+      flex-direction: column !important;
+      gap: 20px !important;
+    }
+
+    .arrow-icon {
+      transform: rotate(90deg);
+      align-self: center;
+    }
+
+    .case-icon-wrap {
+      width: 80px !important;
+      height: 80px !important;
+      font-size: 36px !important;
+    }
+
+    /* 네비게이션 */
+    .nav {
+      bottom: 16px;
+      padding: 8px 16px;
+      gap: 10px;
+    }
+
+    .dot-nav { display: none; }
+    .key-hint { display: none !important; }
+
+    .slide-badge { top: 12px; right: 16px; font-size: 10px; }
+
+    /* 표 — 가로 스크롤 */
+    .diff-table {
+      display: block;
+      overflow-x: auto;
+      font-size: 12px;
+    }
+    .diff-table td:first-child { width: auto; min-width: 90px; }
+
+    .spec-table-wrap { overflow-x: auto; }
+
+    /* slide-7 특수 패딩 복원 */
+    #slide-7 { padding: 36px 16px 100px !important; }
+
+    .prompt-box { font-size: 13px !important; }
+  }
+
+  @media (max-width: 480px) {
+    .creative-grid-2 { grid-template-columns: 1fr !important; }
+  }
+
+  /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
      NEW: 프롬프트 박스 (슬라이드 5, 9)
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
   .prompt-box {
@@ -990,7 +1099,53 @@
   </section>
 
   <!-- ════════════════════════════════
-       SLIDE 2 · 목차
+       SLIDE 2 · 앞으로 이야기할 것들 (목차)
+  ════════════════════════════════ -->
+  <section class="slide" id="slide-toc">
+    <div class="tag tag-purple">TABLE OF CONTENTS</div>
+    <h2 class="section-title">앞으로 이야기할 것들</h2>
+    <div class="divider"></div>
+    <div style="display:flex; flex-direction:column; gap:14px; width:100%; max-width:680px; margin-top:28px;">
+      <div style="display:flex; align-items:center; gap:20px; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 24px;">
+        <span style="font-family:'Space Mono',monospace; font-size:22px; font-weight:700; opacity:.25; flex-shrink:0;">01</span>
+        <div>
+          <div style="font-size:15px; font-weight:700; margin-bottom:3px;">왜 AI 코딩인가?</div>
+          <div style="font-size:12px; color:var(--text-dim);">AI 코딩을 시작한 이유와 기대했던 것들</div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:20px; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 24px;">
+        <span style="font-family:'Space Mono',monospace; font-size:22px; font-weight:700; opacity:.25; flex-shrink:0;">02</span>
+        <div>
+          <div style="font-size:15px; font-weight:700; margin-bottom:3px;">하지만 현실은?</div>
+          <div style="font-size:12px; color:var(--text-dim);">AI에게 끌려다니는 상황과 구조적 문제</div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:20px; background:var(--surface); border:1px solid rgba(255,107,157,.3); border-radius:14px; padding:16px 24px;">
+        <span style="font-family:'Space Mono',monospace; font-size:22px; font-weight:700; color:var(--accent2); opacity:.6; flex-shrink:0;">03</span>
+        <div>
+          <div style="font-size:15px; font-weight:700; margin-bottom:3px; color:var(--accent2);">Case 01 — 로그인 페이지</div>
+          <div style="font-size:12px; color:var(--text-dim);">단순 요청 vs 기능정의서 기반 요청 비교</div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:20px; background:var(--surface); border:1px solid rgba(124,111,255,.3); border-radius:14px; padding:16px 24px;">
+        <span style="font-family:'Space Mono',monospace; font-size:22px; font-weight:700; color:var(--accent); opacity:.6; flex-shrink:0;">04</span>
+        <div>
+          <div style="font-size:15px; font-weight:700; margin-bottom:3px; color:var(--accent);">Case 02 — 크리에이티브 코딩</div>
+          <div style="font-size:12px; color:var(--text-dim);">레퍼런스와 디테일이 만드는 결과물의 차이</div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:20px; background:var(--surface); border:1px solid rgba(249,200,74,.3); border-radius:14px; padding:16px 24px;">
+        <span style="font-family:'Space Mono',monospace; font-size:22px; font-weight:700; color:var(--accent4); opacity:.6; flex-shrink:0;">05</span>
+        <div>
+          <div style="font-size:15px; font-weight:700; margin-bottom:3px; color:var(--accent4);">깨달은 점 & 최종 목표</div>
+          <div style="font-size:12px; color:var(--text-dim);">요구사항 해상도가 결과를 결정한다</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════
+       SLIDE 3 · 목차 (기존)
   ════════════════════════════════ -->
   <section class="slide" id="slide-2">
     <div class="tag tag-purple">WHY AI CODING</div>
@@ -1029,8 +1184,8 @@
       </div>
       <div class="insight-card">
         <div class="ins-icon">🎯</div>
-        <h3>확실한 프롬프트</h3>
-        <p>무엇을 원하는지 명확하게 전달할 수 있다면, AI가 훨씬 더 정확한 결과물을 만들어줄 것이라 기대했다</p>
+        <h3>한 줄의 명령어로 확실한 결과물 구현</h3>
+        <p>무엇을 원하는지 명확하게 전달하면, AI가 정확한 결과물을 만들어줄 것이라 기대했다</p>
       </div>
       <div class="insight-card">
         <div class="ins-icon">💡</div>
@@ -1114,7 +1269,7 @@
     <h2 class="section-title">누락된 기능들</h2>
     <div class="missing-grid">
       <div class="missing-card">
-        <div class="miss-icon">🪪</div>
+        <div class="miss-icon">❎</div>
         <h3>아이디 방식</h3>
         <p>이메일이 아닌 <strong style="color:var(--text)">아이디 기반</strong> 로그인이어야 했음</p>
       </div>
@@ -1297,7 +1452,7 @@
     <div class="tag tag-purple">CASE STUDY 02</div>
     <h2 class="section-title">크리에이티브 코딩 — 단순 요청</h2>
     <div class="prompt-label" style="margin-top:16px; color:var(--accent);">USER PROMPT</div>
-    <div class="prompt-box" style="border-left-color:var(--accent); margin-bottom:24px;">"크리에이티브한 코딩 만들어줘"</div>
+    <div class="prompt-box" style="border-left-color:var(--accent); margin-bottom:24px;">"크리에이티브 코딩 예시 보여줘"</div>
     <div class="creative-grid-2">
       <a class="creative-card" href="사례 2 크리에이티브 코딩/01_particle_flow.html" target="_blank">
         <div class="creative-thumb thumb-particle">
@@ -1366,8 +1521,8 @@
   ════════════════════════════════ -->
   <section class="slide" id="slide-11">
     <div class="tag tag-purple">CASE STUDY 02</div>
-    <h2 class="section-title">레퍼런스 → 결과물</h2>
-    <p class="subtitle" style="margin:12px 0 20px;">레퍼런스 이미지를 바탕으로 재생성 — 훨씬 가까워진 결과</p>
+    <h2 class="section-title">단순요청 결과물 + 레퍼런스</h2>
+    <p class="subtitle" style="margin:12px 0 20px;">레퍼런스 이미지를 바탕으로 재생성 — 한발짝 가까워진 결과</p>
     <div class="creative-grid-2">
       <a class="creative-card" href="사례 2 크리에이티브 코딩/03_glass_world.html" target="_blank">
         <div class="creative-thumb thumb-glass">
@@ -1393,7 +1548,7 @@
   ════════════════════════════════ -->
   <section class="slide" id="slide-12">
     <div class="tag tag-purple">CASE STUDY 02</div>
-    <h2 class="section-title">자세한 설명 → 결과물</h2>
+    <h2 class="section-title">디테일해진 프롬프트</h2>
     <p class="subtitle" style="margin:12px 0 20px;">프롬프트에 더 구체적인 설명 추가 — 3D 효과까지 완성</p>
     <div class="creative-grid-2">
       <a class="creative-card" href="사례 2 크리에이티브 코딩/04_iridescent_bubbles_3d.html" target="_blank">
@@ -1427,9 +1582,9 @@
         <p>내 머릿속이 선명하지 않으면, AI도 선명하게 만들 수 없다. 불명확한 요구사항은 불명확한 결과물을 낳는다.</p>
       </div>
       <div class="insight-card">
-        <div class="ins-icon">🤖</div>
-        <h3>AI도 개발자도 같다</h3>
-        <p>AI에게 전달하는 방식이나, 개발자에게 설명하는 방식이나 — 결국 같은 언어화 능력이 필요하다.</p>
+        <div class="ins-icon">🗣️</div>
+        <h3>말이 구체적일수록 결과도 구체적이다</h3>
+        <p>막연한 요청은 막연한 결과를 낳는다. 의도를 정확한 언어로 전달할수록, 원하는 결과물에 훨씬 가깝게 닿을 수 있다.</p>
       </div>
       <div class="insight-card">
         <div class="ins-icon">📐</div>
