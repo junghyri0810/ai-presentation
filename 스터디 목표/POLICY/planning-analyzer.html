@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>기획 문서 분석기</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: #2a2a3e;
+    --accent: #6c63ff;
+    --accent2: #ff6584;
+    --accent3: #43e97b;
+    --accent4: #f7c948;
+    --text: #e8e8f0;
+    --text-dim: #8888aa;
+    --text-dimmer: #44445a;
+    --grid-color: rgba(108,99,255,0.05);
+    --upload-bg: var(--surface);
+    --spinner-bg: var(--border);
+  }
+
+  :root.light {
+    --bg: #f4f4fb;
+    --surface: #ffffff;
+    --surface2: #f0f0f8;
+    --border: #dcdcee;
+    --accent: #5a52e0;
+    --accent2: #e8476a;
+    --accent3: #1fb85a;
+    --accent4: #d4a800;
+    --text: #1a1a2e;
+    --text-dim: #5a5a7a;
+    --text-dimmer: #b0b0cc;
+    --grid-color: rgba(90,82,224,0.06);
+    --upload-bg: #fafaff;
+    --spinner-bg: #dcdcee;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(var(--grid-color) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+
+  .logo {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+  }
+
+  .title-group h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .title-group p {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .theme-toggle {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .theme-toggle:hover {
+    border-color: var(--accent);
+    transform: scale(1.08);
+  }
+
+  /* Smooth theme transition */
+  *, *::before, *::after {
+    transition: background-color 0.25s, border-color 0.25s, color 0.25s;
+  }
+
+  /* Override transitions for animations */
+  .spinner { transition: none !important; }
+  .analyze-btn::before { transition: opacity 0.3s !important; }
+
+  .badge {
+    margin-left: auto;
+    background: rgba(108,99,255,0.15);
+    border: 1px solid rgba(108,99,255,0.3);
+    color: var(--accent);
+    font-size: 11px;
+    font-family: 'Space Mono', monospace;
+    padding: 4px 10px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+  }
+
+  /* Upload Area */
+  .upload-section {
+    margin-bottom: 32px;
+  }
+
+  .upload-box {
+    border: 2px dashed var(--border);
+    border-radius: 20px;
+    padding: 60px 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: var(--upload-bg);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .upload-box::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(108,99,255,0.08) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .upload-box:hover, .upload-box.drag-over {
+    border-color: var(--accent);
+    background: rgba(108,99,255,0.05);
+  }
+
+  .upload-box:hover::before, .upload-box.drag-over::before {
+    opacity: 1;
+  }
+
+  .upload-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    display: block;
+  }
+
+  .upload-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .upload-desc {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+
+  .file-types {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .file-type-tag {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-family: 'Space Mono', monospace;
+    color: var(--text-dim);
+  }
+
+  #fileInput { display: none; }
+
+  /* File preview */
+  .file-preview {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-top: 16px;
+  }
+
+  .file-preview.show { display: flex; }
+
+  .file-icon-preview {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .file-info { flex: 1; min-width: 0; }
+  .file-name {
+    font-weight: 500;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .file-size { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+
+  .remove-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 18px;
+    padding: 4px;
+    transition: color 0.2s;
+  }
+  .remove-btn:hover { color: var(--accent2); }
+
+  /* Prompt area */
+  .prompt-section {
+    margin-bottom: 24px;
+  }
+
+  .section-label {
+    font-size: 12px;
+    font-family: 'Space Mono', monospace;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  textarea {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 14px;
+    resize: vertical;
+    min-height: 100px;
+    transition: border-color 0.2s;
+    line-height: 1.6;
+  }
+
+  textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  textarea::placeholder { color: var(--text-dimmer); }
+
+  /* Analyze button */
+  .analyze-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent), #8b5cf6);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+
+  .analyze-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #8b5cf6, var(--accent));
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .analyze-btn:hover::before { opacity: 1; }
+  .analyze-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 32px rgba(108,99,255,0.4); }
+  .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .analyze-btn span { position: relative; z-index: 1; }
+
+  /* Loading */
+  .loading {
+    display: none;
+    text-align: center;
+    padding: 60px;
+  }
+
+  .loading.show { display: block; }
+
+  .spinner {
+    width: 48px;
+    height: 48px;
+    border: 3px solid var(--spinner-bg);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 20px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+
+  .loading-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 300px;
+    margin: 16px auto 0;
+    text-align: left;
+  }
+
+  .loading-step {
+    font-size: 13px;
+    color: var(--text-dimmer);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: color 0.3s;
+  }
+
+  .loading-step.active { color: var(--accent); }
+  .loading-step.done { color: var(--accent3); }
+
+  /* Results */
+  .results { display: none; }
+  .results.show { display: block; }
+
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    flex-wrap: gap;
+    gap: 12px;
+  }
+
+  .results-title {
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .results-meta {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* Summary stats */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+
+  .stat-number {
+    font-size: 28px;
+    font-weight: 900;
+    font-family: 'Space Mono', monospace;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  /* Category sections */
+  .category {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+
+  .category-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    cursor: pointer;
+    transition: background 0.2s;
+    user-select: none;
+  }
+
+  .category-header:hover { background: rgba(255,255,255,0.02); }
+
+  .category-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .category-name {
+    font-weight: 700;
+    font-size: 15px;
+  }
+
+  .category-count {
+    margin-left: auto;
+    font-size: 12px;
+    font-family: 'Space Mono', monospace;
+    background: rgba(255,255,255,0.06);
+    border-radius: 6px;
+    padding: 3px 10px;
+    color: var(--text-dim);
+  }
+
+  .chevron {
+    font-size: 12px;
+    color: var(--text-dim);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+
+  .category.open .chevron { transform: rotate(180deg); }
+
+  .category-body {
+    display: none;
+    padding: 0 20px 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .category.open .category-body { display: block; }
+
+  .issue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .issue-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: 3px solid;
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+
+  .issue-severity {
+    display: inline-block;
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 1px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-weight: 700;
+  }
+
+  .sev-high { background: rgba(255,101,132,0.2); color: var(--accent2); }
+  .sev-mid { background: rgba(247,201,72,0.2); color: var(--accent4); }
+  .sev-low { background: rgba(67,233,123,0.2); color: var(--accent3); }
+
+  .issue-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+  .issue-desc { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+  .issue-suggestion {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: rgba(108,99,255,0.08);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--accent);
+    border-left: 2px solid var(--accent);
+  }
+
+  .issue-suggestion::before {
+    content: '💡 제안 ';
+    font-weight: 600;
+  }
+
+  /* Reset btn */
+  .reset-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-dim);
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif;
+    transition: all 0.2s;
+  }
+
+  .reset-btn:hover { color: var(--text); border-color: var(--text-dim); }
+
+  /* Error */
+  .error-box {
+    display: none;
+    background: rgba(255,101,132,0.1);
+    border: 1px solid rgba(255,101,132,0.3);
+    border-radius: 12px;
+    padding: 16px 20px;
+    color: var(--accent2);
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+
+  .error-box.show { display: block; }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .upload-box { padding: 40px 20px; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo">📋</div>
+    <div class="title-group">
+      <h1>기획 문서 분석기</h1>
+      <p>누락 기능 · 정책 이슈 · UX 문제를 자동으로 검출합니다</p>
+    </div>
+    <span class="badge">AI POWERED</span>
+    <button class="theme-toggle" id="themeToggle" title="라이트/다크 모드 전환">🌙</button>
+  </header>
+
+  <!-- Upload Section -->
+  <div class="upload-section">
+    <div class="section-label">문서 업로드</div>
+    <div class="upload-box" id="uploadBox">
+      <span class="upload-icon">📁</span>
+      <div class="upload-title">파일을 여기에 드래그하거나 클릭하세요</div>
+      <div class="upload-desc">
+        기획서, 화면 설계서, 기능 정의서를 업로드하면<br>
+        AI가 자동으로 이슈를 분석해드립니다
+      </div>
+      <div class="file-types">
+        <span class="file-type-tag">PDF</span>
+        <span class="file-type-tag">PNG / JPG</span>
+        <span class="file-type-tag">PPT / PPTX</span>
+        <span class="file-type-tag">DOCX</span>
+      </div>
+      <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.pptx,.ppt,.docx,.doc">
+    </div>
+    <div class="file-preview" id="filePreview">
+      <div class="file-icon-preview" id="fileIconPreview"></div>
+      <div class="file-info">
+        <div class="file-name" id="fileName"></div>
+        <div class="file-size" id="fileSize"></div>
+      </div>
+      <button class="remove-btn" id="removeBtn">✕</button>
+    </div>
+  </div>
+
+  <!-- Prompt Section -->
+  <div class="prompt-section">
+    <div class="section-label">추가 맥락 (선택)</div>
+    <textarea id="contextInput" placeholder="분석 시 참고할 내용을 자유롭게 입력하세요.&#10;예) 이 문서는 B2B SaaS 관리자 페이지 기획서입니다. 주로 권한 관리와 결제 흐름이 포함되어 있습니다."></textarea>
+  </div>
+
+  <!-- Error Box -->
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- Analyze Button -->
+  <button class="analyze-btn" id="analyzeBtn" disabled>
+    <span>🔍 &nbsp; 분석 시작하기</span>
+  </button>
+
+  <!-- Loading -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">문서를 분석하고 있습니다...</div>
+    <div class="loading-steps">
+      <div class="loading-step" id="step1">📄 &nbsp; 문서 내용 파악 중</div>
+      <div class="loading-step" id="step2">🔍 &nbsp; 누락 기능 검토 중</div>
+      <div class="loading-step" id="step3">⚠️ &nbsp; 정책 이슈 분석 중</div>
+      <div class="loading-step" id="step4">✨ &nbsp; 리포트 생성 중</div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results"></div>
+</div>
+
+<script>
+// Theme toggle
+const themeToggle = document.getElementById('themeToggle');
+let isLight = false;
+
+themeToggle.addEventListener('click', () => {
+  isLight = !isLight;
+  document.documentElement.classList.toggle('light', isLight);
+  themeToggle.textContent = isLight ? '🌙' : '☀️';
+});
+
+const uploadBox = document.getElementById('uploadBox');
+const fileInput = document.getElementById('fileInput');
+const filePreview = document.getElementById('filePreview');
+const fileIconPreview = document.getElementById('fileIconPreview');
+const fileName = document.getElementById('fileName');
+const fileSize = document.getElementById('fileSize');
+const removeBtn = document.getElementById('removeBtn');
+const analyzeBtn = document.getElementById('analyzeBtn');
+const loading = document.getElementById('loading');
+const results = document.getElementById('results');
+const errorBox = document.getElementById('errorBox');
+const contextInput = document.getElementById('contextInput');
+
+let selectedFile = null;
+let fileBase64 = null;
+let fileMediaType = null;
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+function getFileIcon(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  const icons = { pdf: '📕', png: '🖼️', jpg: '🖼️', jpeg: '🖼️', pptx: '📊', ppt: '📊', docx: '📝', doc: '📝' };
+  return icons[ext] || '📄';
+}
+
+function getFileBg(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  if (['png','jpg','jpeg'].includes(ext)) return 'rgba(67,233,123,0.15)';
+  if (['pptx','ppt'].includes(ext)) return 'rgba(255,101,132,0.15)';
+  if (['docx','doc'].includes(ext)) return 'rgba(108,99,255,0.15)';
+  return 'rgba(247,201,72,0.15)';
+}
+
+function getMediaType(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  if (ext === 'pdf') return 'application/pdf';
+  if (['png'].includes(ext)) return 'image/png';
+  if (['jpg','jpeg'].includes(ext)) return 'image/jpeg';
+  return null;
+}
+
+function setFile(file) {
+  selectedFile = file;
+  fileIconPreview.textContent = getFileIcon(file.name);
+  fileIconPreview.style.background = getFileBg(file.name);
+  fileName.textContent = file.name;
+  fileSize.textContent = formatBytes(file.size);
+  filePreview.classList.add('show');
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    fileBase64 = e.target.result.split(',')[1];
+    fileMediaType = getMediaType(file.name);
+    analyzeBtn.disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+uploadBox.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+uploadBox.addEventListener('dragover', (e) => { e.preventDefault(); uploadBox.classList.add('drag-over'); });
+uploadBox.addEventListener('dragleave', () => uploadBox.classList.remove('drag-over'));
+uploadBox.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadBox.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+});
+
+removeBtn.addEventListener('click', () => {
+  selectedFile = null;
+  fileBase64 = null;
+  fileMediaType = null;
+  fileInput.value = '';
+  filePreview.classList.remove('show');
+  analyzeBtn.disabled = true;
+});
+
+// Loading animation
+function animateSteps(durations = [1200, 1000, 1000, 800]) {
+  const steps = ['step1','step2','step3','step4'];
+  let i = 0;
+  function next() {
+    if (i > 0) document.getElementById(steps[i-1]).classList.replace('active','done');
+    if (i < steps.length) {
+      document.getElementById(steps[i]).classList.add('active');
+      setTimeout(() => { i++; next(); }, durations[i] || 1000);
+    }
+  }
+  next();
+}
+
+function showError(msg) {
+  errorBox.textContent = msg;
+  errorBox.classList.add('show');
+  setTimeout(() => errorBox.classList.remove('show'), 6000);
+}
+
+// Build prompt
+function buildPrompt(filename, context) {
+  const ext = filename.split('.').pop().toLowerCase();
+  const fileType = ['png','jpg','jpeg'].includes(ext) ? '화면 캡처 이미지' :
+                   ext === 'pdf' ? 'PDF 기획 문서' :
+                   ['pptx','ppt'].includes(ext) ? 'PPT 화면 설계서' : 'Word 기능 정의서';
+
+  return `당신은 10년 경력의 수석 웹 서비스 기획자이자 UX 전문가입니다.
+아래 ${fileType}를 분석하여 기획 이슈를 찾아주세요.
+${context ? `\n[추가 맥락]\n${context}\n` : ''}
+반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요.
+
+{
+  "summary": "전체 문서에 대한 2-3줄 요약",
+  "totalIssues": 숫자,
+  "categories": [
+    {
+      "id": "missing_feature",
+      "name": "누락 기능",
+      "icon": "🔧",
+      "color": "#ff6584",
+      "issues": [
+        {
+          "title": "이슈 제목",
+          "severity": "HIGH|MID|LOW",
+          "description": "이슈 설명 (구체적으로)",
+          "suggestion": "개선 제안"
+        }
+      ]
+    },
+    {
+      "id": "policy",
+      "name": "정책 미정의",
+      "icon": "📋",
+      "color": "#f7c948",
+      "issues": []
+    },
+    {
+      "id": "ux_flow",
+      "name": "UX 흐름 이슈",
+      "icon": "🔀",
+      "color": "#6c63ff",
+      "issues": []
+    },
+    {
+      "id": "edge_case",
+      "name": "예외 케이스",
+      "icon": "⚠️",
+      "color": "#43e97b",
+      "issues": []
+    },
+    {
+      "id": "security",
+      "name": "보안/권한",
+      "icon": "🔒",
+      "color": "#a78bfa",
+      "issues": []
+    }
+  ]
+}
+
+각 카테고리에 실제 발견된 이슈만 포함하고, 이슈가 없는 카테고리는 빈 배열로 두세요.
+이슈는 카테고리당 최대 5개, severity HIGH/MID/LOW로 구분하세요.
+문서가 이미지나 PDF인 경우 내용을 최대한 읽고 구체적인 이슈를 찾아주세요.`;
+}
+
+// Render results
+function renderResults(data, filename) {
+  const totalHigh = data.categories.flatMap(c => c.issues).filter(i => i.severity === 'HIGH').length;
+  const totalMid = data.categories.flatMap(c => c.issues).filter(i => i.severity === 'MID').length;
+  const totalLow = data.categories.flatMap(c => c.issues).filter(i => i.severity === 'LOW').length;
+
+  let html = `
+    <div class="results-header">
+      <div>
+        <div class="results-title">📊 분석 결과</div>
+        <div class="results-meta" style="margin-top:4px">${filename}</div>
+      </div>
+      <button class="reset-btn" id="resetBtn">↩ 다시 분석</button>
+    </div>
+  `;
+
+  if (data.summary) {
+    html += `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:24px;font-size:14px;line-height:1.7;color:var(--text-dim);">
+        <span style="color:var(--text);font-weight:600;">📌 문서 요약&nbsp;&nbsp;</span>${data.summary}
+      </div>
+    `;
+  }
+
+  html += `<div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-number" style="color:var(--accent)">${data.totalIssues}</div>
+      <div class="stat-label">총 이슈</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number" style="color:var(--accent2)">${totalHigh}</div>
+      <div class="stat-label">🔴 높음</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number" style="color:var(--accent4)">${totalMid}</div>
+      <div class="stat-label">🟡 중간</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number" style="color:var(--accent3)">${totalLow}</div>
+      <div class="stat-label">🟢 낮음</div>
+    </div>
+  </div>`;
+
+  data.categories.forEach(cat => {
+    if (!cat.issues || cat.issues.length === 0) return;
+
+    const issuesHtml = cat.issues.map(issue => {
+      const sevClass = issue.severity === 'HIGH' ? 'sev-high' : issue.severity === 'MID' ? 'sev-mid' : 'sev-low';
+      const sevLabel = issue.severity === 'HIGH' ? '높음' : issue.severity === 'MID' ? '중간' : '낮음';
+      return `
+        <div class="issue-item" style="border-left-color:${cat.color}">
+          <span class="issue-severity ${sevClass}">${sevLabel}</span>
+          <div class="issue-title">${issue.title}</div>
+          <div class="issue-desc">${issue.description}</div>
+          ${issue.suggestion ? `<div class="issue-suggestion">${issue.suggestion}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    html += `
+      <div class="category open">
+        <div class="category-header" onclick="this.parentElement.classList.toggle('open')">
+          <div class="category-icon" style="background:${cat.color}22">${cat.icon}</div>
+          <div class="category-name">${cat.name}</div>
+          <span class="category-count">${cat.issues.length}건</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="category-body">
+          <div class="issue-list">${issuesHtml}</div>
+        </div>
+      </div>
+    `;
+  });
+
+  results.innerHTML = html;
+  results.classList.add('show');
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    results.classList.remove('show');
+    results.innerHTML = '';
+    removeBtn.click();
+    contextInput.value = '';
+  });
+}
+
+// Main analyze
+analyzeBtn.addEventListener('click', async () => {
+  if (!selectedFile || !fileBase64) return;
+
+  errorBox.classList.remove('show');
+  analyzeBtn.disabled = true;
+  loading.classList.add('show');
+  results.classList.remove('show');
+
+  animateSteps([1500, 1200, 1200, 800]);
+
+  try {
+    const ext = selectedFile.name.split('.').pop().toLowerCase();
+    const isImage = ['png','jpg','jpeg'].includes(ext);
+    const isPdf = ext === 'pdf';
+    const context = contextInput.value.trim();
+    const prompt = buildPrompt(selectedFile.name, context);
+
+    let messages;
+
+    if (isImage) {
+      messages = [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: fileMediaType, data: fileBase64 } },
+          { type: 'text', text: prompt }
+        ]
+      }];
+    } else if (isPdf) {
+      messages = [{
+        role: 'user',
+        content: [
+          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: fileBase64 } },
+          { type: 'text', text: prompt }
+        ]
+      }];
+    } else {
+      // PPT/DOCX: 텍스트로 설명 요청
+      messages = [{
+        role: 'user',
+        content: [
+          { type: 'text', text: `파일명: ${selectedFile.name}\n파일 형식: ${ext.toUpperCase()}\n\n${prompt}\n\n※ 이 파일은 직접 파싱이 어렵습니다. 파일 형식과 이름을 바탕으로 일반적인 ${ext.toUpperCase()} 기획 문서에서 자주 발생하는 이슈를 분석해주세요.` }
+        ]
+      }];
+    }
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 3000,
+        messages
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || '분석 중 오류가 발생했습니다.');
+    }
+
+    const data = await response.json();
+    const text = data.content.map(b => b.text || '').join('');
+    const clean = text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+
+    loading.classList.remove('show');
+    renderResults(parsed, selectedFile.name);
+
+  } catch (err) {
+    loading.classList.remove('show');
+    analyzeBtn.disabled = false;
+    showError('분석 실패: ' + err.message);
+    console.error(err);
+  }
+});
+</script>
+</body>
+</html>

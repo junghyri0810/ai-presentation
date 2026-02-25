@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+
+        <!-- ===== 로그인 폼 ===== -->
+        <div class="card" id="loginCard">
+            <h1 class="logo">Welcome</h1>
+            <p class="subtitle">계정에 로그인하세요</p>
+
+            <form id="loginForm" onsubmit="return handleLogin(event)">
+                <div class="input-group">
+                    <label for="loginId">아이디</label>
+                    <input type="text" id="loginId" placeholder="아이디를 입력하세요" autocomplete="username">
+                    <span class="error-msg" id="loginIdError"></span>
+                </div>
+                <div class="input-group">
+                    <label for="loginPassword">비밀번호</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="loginPassword" placeholder="비밀번호를 입력하세요" autocomplete="current-password">
+                        <button type="button" class="toggle-pw" onclick="togglePassword('loginPassword', this)">👁</button>
+                    </div>
+                    <span class="error-msg" id="loginPasswordError"></span>
+                </div>
+
+                <div class="options">
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="saveId">
+                            <span>아이디 저장</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="autoLogin">
+                            <span>자동 로그인</span>
+                        </label>
+                    </div>
+                    <div class="link-group">
+                        <a href="#" class="link" onclick="showCard('findIdCard'); return false;">아이디 찾기</a>
+                        <span class="link-divider">|</span>
+                        <a href="#" class="link" onclick="showCard('forgotCard'); return false;">비밀번호 찾기</a>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary">로그인</button>
+            </form>
+
+            <div class="divider"><span>또는</span></div>
+
+            <div class="social-buttons">
+                <button class="btn-social btn-google" onclick="socialLogin('Google')">
+                    <svg viewBox="0 0 24 24" width="20" height="20">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Google로 로그인
+                </button>
+                <button class="btn-social btn-kakao" onclick="socialLogin('Kakao')">
+                    <svg viewBox="0 0 24 24" width="20" height="20">
+                        <path fill="#000" d="M12 3C6.48 3 2 6.36 2 10.5c0 2.67 1.76 5.02 4.4 6.35-.14.52-.9 3.34-.93 3.56 0 0-.02.17.09.24.1.06.23.01.23.01.31-.04 3.56-2.33 4.12-2.73.68.1 1.38.15 2.09.15 5.52 0 10-3.36 10-7.5S17.52 3 12 3z"/>
+                    </svg>
+                    Kakao로 로그인
+                </button>
+                <button class="btn-social btn-naver" onclick="socialLogin('Naver')">
+                    <svg viewBox="0 0 24 24" width="20" height="20">
+                        <path fill="#fff" d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/>
+                    </svg>
+                    Naver로 로그인
+                </button>
+            </div>
+
+            <p class="footer-text">
+                계정이 없으신가요? <a href="#" class="link" onclick="showCard('signupTermsCard'); return false;">회원가입</a>
+            </p>
+        </div>
+
+        <!-- ===== 약관동의 (회원가입 Step 1) ===== -->
+        <div class="card hidden" id="signupTermsCard">
+            <h1 class="logo">Sign Up</h1>
+            <p class="subtitle">서비스 이용약관에 동의해주세요</p>
+
+            <div class="step-indicator">
+                <div class="step active">
+                    <span class="step-num">1</span>
+                    <span class="step-label">약관동의</span>
+                </div>
+                <div class="step-line"></div>
+                <div class="step">
+                    <span class="step-num">2</span>
+                    <span class="step-label">정보입력</span>
+                </div>
+            </div>
+
+            <form id="termsForm" onsubmit="return handleSignupTerms(event)">
+                <div class="terms-group">
+                    <label class="checkbox-label terms-all">
+                        <input type="checkbox" id="agreeAll" onchange="toggleAllTerms(this)">
+                        <span class="terms-all-text">약관 전체동의</span>
+                    </label>
+                    <div class="terms-divider"></div>
+                    <label class="checkbox-label terms-item">
+                        <input type="checkbox" id="agreeTerms1" class="term-item" onchange="syncAllTerms()">
+                        <span>[필수] 이용약관 동의</span>
+                        <a href="#" class="link terms-view" onclick="viewTerms('이용약관'); return false;">보기</a>
+                    </label>
+                    <label class="checkbox-label terms-item">
+                        <input type="checkbox" id="agreeTerms2" class="term-item" onchange="syncAllTerms()">
+                        <span>[필수] 개인정보수집 및 이용동의</span>
+                        <a href="#" class="link terms-view" onclick="viewTerms('개인정보수집 및 이용동의'); return false;">보기</a>
+                    </label>
+                    <label class="checkbox-label terms-item">
+                        <input type="checkbox" id="agreeTerms3" class="term-item" onchange="syncAllTerms()">
+                        <span>[선택] 개인정보 제3자 제공동의</span>
+                        <a href="#" class="link terms-view" onclick="viewTerms('개인정보 제3자 제공동의'); return false;">보기</a>
+                    </label>
+                </div>
+                <span class="error-msg" id="termsError"></span>
+
+                <button type="submit" class="btn-primary" style="margin-top:24px;">다음</button>
+            </form>
+
+            <p class="footer-text" style="margin-top:16px;">
+                <a href="#" class="link" onclick="showCard('loginCard'); return false;">← 로그인으로 돌아가기</a>
+            </p>
+        </div>
+
+        <!-- ===== 개인정보 입력 (회원가입 Step 2) ===== -->
+        <div class="card hidden" id="signupCard">
+            <h1 class="logo">Sign Up</h1>
+            <p class="subtitle">회원 정보를 입력해주세요</p>
+
+            <div class="step-indicator">
+                <div class="step done">
+                    <span class="step-num">✓</span>
+                    <span class="step-label">약관동의</span>
+                </div>
+                <div class="step-line done"></div>
+                <div class="step active">
+                    <span class="step-num">2</span>
+                    <span class="step-label">정보입력</span>
+                </div>
+            </div>
+
+            <form id="signupForm" onsubmit="return handleSignup(event)">
+
+                <!-- 아이디 -->
+                <div class="input-group">
+                    <label for="signupId">아이디</label>
+                    <input type="text" id="signupId" placeholder="영문+숫자, 8~30자" autocomplete="username"
+                           oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g,'')">
+                    <span class="error-msg" id="signupIdError"></span>
+                    <span class="hint-msg">영문, 숫자만 사용 가능 (8~30자, 대문자 자동변환)</span>
+                </div>
+
+                <!-- 비밀번호 -->
+                <div class="input-group">
+                    <label for="signupPassword">비밀번호</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="signupPassword" placeholder="영문+숫자+특수문자, 8~12자" autocomplete="new-password">
+                        <button type="button" class="toggle-pw" onclick="togglePassword('signupPassword', this)">👁</button>
+                    </div>
+                    <div class="password-strength" id="passwordStrength"></div>
+                    <span class="error-msg" id="signupPasswordError"></span>
+                </div>
+
+                <!-- 비밀번호 확인 -->
+                <div class="input-group">
+                    <label for="signupPasswordConfirm">비밀번호 확인</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="signupPasswordConfirm" placeholder="비밀번호를 다시 입력하세요" autocomplete="new-password">
+                        <button type="button" class="toggle-pw" onclick="togglePassword('signupPasswordConfirm', this)">👁</button>
+                    </div>
+                    <span class="error-msg" id="signupPasswordConfirmError"></span>
+                </div>
+
+                <!-- 본인인증 -->
+                <div class="input-group">
+                    <label>본인인증</label>
+                    <div class="auth-btn-row">
+                        <button type="button" class="btn-secondary" onclick="simulateVerification('phone')">📱 휴대폰 인증</button>
+                        <button type="button" class="btn-secondary" onclick="simulateVerification('aipin')">🪪 아이핀 인증</button>
+                    </div>
+                    <span class="error-msg" id="verifyError"></span>
+                </div>
+
+                <!-- 이름 (본인인증 후 자동입력) -->
+                <div class="input-group">
+                    <label for="signupName">이름</label>
+                    <input type="text" id="signupName" placeholder="본인인증 후 자동입력" readonly>
+                </div>
+
+                <!-- 생년월일 (본인인증 후 자동입력) -->
+                <div class="input-group">
+                    <label for="signupBirth">생년월일</label>
+                    <input type="text" id="signupBirth" placeholder="본인인증 후 자동입력" readonly>
+                </div>
+
+                <!-- 주소 -->
+                <div class="input-group">
+                    <label>주소</label>
+                    <div class="address-row">
+                        <input type="text" id="signupPostcode" placeholder="우편번호" readonly>
+                        <button type="button" class="btn-secondary btn-sm" onclick="searchAddress()">우편번호 찾기</button>
+                    </div>
+                    <input type="text" id="signupAddr1" placeholder="기본주소 (우편번호 검색 후 자동입력)" readonly style="margin-top:8px;">
+                    <input type="text" id="signupAddr2" placeholder="상세주소 입력" style="margin-top:8px;" autocomplete="address-line2">
+                </div>
+
+                <!-- 전화번호 -->
+                <div class="input-group">
+                    <label>전화번호</label>
+                    <div class="radio-row">
+                        <label class="radio-label">
+                            <input type="radio" name="phoneType" value="home" checked>
+                            <span>자택</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="phoneType" value="work">
+                            <span>직장</span>
+                        </label>
+                    </div>
+                    <input type="tel" id="signupPhone" placeholder="예: 02-0000-0000">
+                </div>
+
+                <!-- 휴대폰번호 (본인인증 후 자동입력) -->
+                <div class="input-group">
+                    <label for="signupMobile">휴대폰번호</label>
+                    <input type="tel" id="signupMobile" placeholder="본인인증 후 자동입력" readonly>
+                </div>
+
+                <!-- 이메일 -->
+                <div class="input-group">
+                    <label>이메일</label>
+                    <div class="email-row">
+                        <input type="text" id="signupEmailLocal" placeholder="이메일 앞자리">
+                        <span class="at-sign">@</span>
+                        <input type="text" id="signupEmailDomain" placeholder="직접입력">
+                        <select id="signupEmailSelect" onchange="setEmailDomain(this.value)">
+                            <option value="">선택</option>
+                            <option value="naver.com">naver.com</option>
+                            <option value="gmail.com">gmail.com</option>
+                            <option value="kakao.com">kakao.com</option>
+                            <option value="daum.net">daum.net</option>
+                            <option value="nate.com">nate.com</option>
+                            <option value="direct">직접입력</option>
+                        </select>
+                    </div>
+                    <span class="error-msg" id="signupEmailError"></span>
+                </div>
+
+                <!-- 정보 수신동의 -->
+                <div class="input-group">
+                    <label>정보 수신동의 <span class="label-optional">(선택)</span></label>
+                    <div class="receive-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="agreeSMS">
+                            <span>SMS 수신 동의</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="agreeEmailReceive">
+                            <span>이메일 수신 동의</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button type="button" class="btn-secondary" onclick="showCard('signupTermsCard')">취소</button>
+                    <button type="submit" class="btn-primary">회원가입 완료</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- ===== 아이디 찾기 ===== -->
+        <div class="card hidden" id="findIdCard">
+            <h1 class="logo">아이디 찾기</h1>
+            <p class="subtitle">본인인증으로 아이디를 확인하세요</p>
+
+            <div class="auth-buttons">
+                <button class="btn-auth" onclick="findIdByAuth('phone')">
+                    <span class="auth-icon">📱</span>
+                    <span>휴대폰 본인인증</span>
+                </button>
+                <button class="btn-auth" onclick="findIdByAuth('aipin')">
+                    <span class="auth-icon">🪪</span>
+                    <span>아이핀 본인인증</span>
+                </button>
+            </div>
+
+            <p class="footer-text" style="margin-top:24px;">
+                <a href="#" class="link" onclick="showCard('loginCard'); return false;">← 로그인으로 돌아가기</a>
+            </p>
+        </div>
+
+        <!-- ===== 비밀번호 찾기 ===== -->
+        <div class="card hidden" id="forgotCard">
+            <h1 class="logo">비밀번호 찾기</h1>
+            <p class="subtitle">아이디 확인 후 본인인증을 해주세요</p>
+
+            <div class="input-group">
+                <label for="forgotId">아이디</label>
+                <input type="text" id="forgotId" placeholder="아이디를 입력하세요"
+                       oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g,'')">
+                <span class="error-msg" id="forgotIdError"></span>
+            </div>
+
+            <div class="auth-buttons">
+                <button class="btn-auth" onclick="forgotByAuth('phone')">
+                    <span class="auth-icon">📱</span>
+                    <span>휴대폰 본인인증</span>
+                </button>
+                <button class="btn-auth" onclick="forgotByAuth('aipin')">
+                    <span class="auth-icon">🪪</span>
+                    <span>아이핀 본인인증</span>
+                </button>
+            </div>
+
+            <p class="footer-text" style="margin-top:24px;">
+                <a href="#" class="link" onclick="showCard('loginCard'); return false;">← 로그인으로 돌아가기</a>
+            </p>
+        </div>
+
+        <!-- ===== 성공 메시지 카드 ===== -->
+        <div class="card hidden" id="successCard">
+            <div class="success-icon">✓</div>
+            <h1 class="logo" id="successTitle">완료!</h1>
+            <p class="subtitle" id="successMessage"></p>
+            <button class="btn-primary" onclick="showCard('loginCard')">로그인으로 돌아가기</button>
+        </div>
+
+    </div>
+
+    <!-- 토스트 알림 -->
+    <div id="toast" class="toast"></div>
+
+    <!-- 팝업 모달 -->
+    <div id="modal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <div class="modal-icon">⚠️</div>
+            <p class="modal-message" id="modalMessage"></p>
+            <button class="btn-primary" onclick="closeModal()">확인</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

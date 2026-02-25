@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Particle Flow</title>
+  <style>
+    * { margin: 0; padding: 0; }
+    body { background: #0a0a0f; overflow: hidden; }
+    canvas { display: block; }
+    #info {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.4);
+      font-family: monospace;
+      font-size: 13px;
+      letter-spacing: 0.1em;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">마우스를 움직여보세요 · 클릭하면 폭발</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let W = canvas.width = window.innerWidth;
+let H = canvas.height = window.innerHeight;
+
+const mouse = { x: W / 2, y: H / 2, px: W / 2, py: H / 2 };
+
+window.addEventListener('resize', () => {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+});
+
+window.addEventListener('mousemove', e => {
+  mouse.px = mouse.x;
+  mouse.py = mouse.y;
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+
+// ── 파티클 ─────────────────────────────────────────────────
+class Particle {
+  constructor(x, y, burst = false) {
+    this.reset(x, y, burst);
+  }
+
+  reset(x, y, burst = false) {
+    this.x = x ?? Math.random() * W;
+    this.y = y ?? Math.random() * H;
+    this.size = Math.random() * 2.5 + 0.5;
+    this.baseSize = this.size;
+
+    if (burst) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 8 + 2;
+      this.vx = Math.cos(angle) * speed;
+      this.vy = Math.sin(angle) * speed;
+      this.life = 1;
+      this.decay = Math.random() * 0.02 + 0.01;
+    } else {
+      this.vx = (Math.random() - 0.5) * 1.5;
+      this.vy = (Math.random() - 0.5) * 1.5;
+      this.life = Math.random() * 0.5 + 0.5;
+      this.decay = Math.random() * 0.005 + 0.001;
+    }
+
+    this.hue = Math.random() * 60 + 180; // 청록~보라
+    this.burst = burst;
+  }
+
+  update() {
+    // 마우스 인력
+    const dx = mouse.x - this.x;
+    const dy = mouse.y - this.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 200 && !this.burst) {
+      const force = (200 - dist) / 200;
+      this.vx += dx / dist * force * 0.3;
+      this.vy += dy / dist * force * 0.3;
+    }
+
+    // 마찰
+    this.vx *= 0.97;
+    this.vy *= 0.97;
+
+    this.x += this.vx;
+    this.y += this.vy;
+    this.life -= this.decay;
+
+    // 화면 밖 처리
+    if (!this.burst) {
+      if (this.x < 0) this.x = W;
+      if (this.x > W) this.x = 0;
+      if (this.y < 0) this.y = H;
+      if (this.y > H) this.y = 0;
+      if (this.life < 0.1) this.reset();
+    }
+  }
+
+  draw() {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, this.life) * 0.85;
+
+    // 글로우 효과
+    ctx.shadowBlur = this.size * 6;
+    ctx.shadowColor = `hsl(${this.hue}, 90%, 70%)`;
+    ctx.fillStyle = `hsl(${this.hue}, 80%, 75%)`;
+
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, Math.max(0, this.size * this.life), 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  isDead() {
+    return this.burst && this.life <= 0;
+  }
+}
+
+// ── 트레일 (마우스 흔적) ────────────────────────────────────
+class Trail {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.size = Math.random() * 3 + 1;
+    this.life = 1;
+    this.hue = Math.random() * 60 + 200;
+  }
+
+  update() { this.life -= 0.04; }
+
+  draw() {
+    ctx.save();
+    ctx.globalAlpha = this.life * 0.6;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = `hsl(${this.hue}, 90%, 80%)`;
+    ctx.fillStyle = `hsl(${this.hue}, 70%, 85%)`;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, Math.max(0, this.size * this.life), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  isDead() { return this.life <= 0; }
+}
+
+// ── 초기화 ─────────────────────────────────────────────────
+let particles = Array.from({ length: 300 }, () => new Particle());
+let trails = [];
+let bursts = [];
+
+// 클릭 → 폭발
+window.addEventListener('click', e => {
+  for (let i = 0; i < 60; i++) {
+    bursts.push(new Particle(e.clientX, e.clientY, true));
+  }
+});
+
+// ── 루프 ───────────────────────────────────────────────────
+function loop() {
+  // 잔상
+  ctx.fillStyle = 'rgba(10, 10, 15, 0.15)';
+  ctx.fillRect(0, 0, W, H);
+
+  // 마우스 트레일
+  const dx = mouse.x - mouse.px;
+  const dy = mouse.y - mouse.py;
+  if (Math.abs(dx) + Math.abs(dy) > 2) {
+    trails.push(new Trail(mouse.x, mouse.y));
+  }
+
+  trails = trails.filter(t => !t.isDead());
+  trails.forEach(t => { t.update(); t.draw(); });
+
+  // 파티클
+  particles.forEach(p => { p.update(); p.draw(); });
+
+  // 폭발 파티클
+  bursts = bursts.filter(b => !b.isDead());
+  bursts.forEach(b => { b.update(); b.draw(); });
+
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>

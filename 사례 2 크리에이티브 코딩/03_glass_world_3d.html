@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Bubble World 3D 🫧</title>
+  <style>
+    * { margin: 0; padding: 0; }
+    body {
+      overflow: hidden;
+      background: linear-gradient(180deg, #42aff5 0%, #60c0f8 45%, #88d2f8 100%);
+    }
+    canvas { display: block; }
+    #hint {
+      position: fixed; bottom: 22px; left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,.7);
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 14px; letter-spacing: .07em; pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+<div id="hint">클릭하면 오브젝트 생성 · 마우스로 시점 변화 ✨</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+// ── mergeGeos 인라인 구현 (CDN 의존 제거) ────────────
+function mergeGeos(geos) {
+  const parts = geos.map(g => g.index ? g.toNonIndexed() : g);
+  let posLen = 0, normLen = 0, uvLen = 0;
+  parts.forEach(g => {
+    posLen  += g.attributes.position.array.length;
+    if (g.attributes.normal) normLen += g.attributes.normal.array.length;
+    if (g.attributes.uv)     uvLen   += g.attributes.uv.array.length;
+  });
+  const posArr  = new Float32Array(posLen);
+  const normArr = normLen ? new Float32Array(normLen) : null;
+  const uvArr   = uvLen   ? new Float32Array(uvLen)   : null;
+  let pi = 0, ni = 0, ui = 0;
+  parts.forEach(g => {
+    posArr.set(g.attributes.position.array, pi); pi += g.attributes.position.array.length;
+    if (normArr && g.attributes.normal) { normArr.set(g.attributes.normal.array, ni); ni += g.attributes.normal.array.length; }
+    if (uvArr   && g.attributes.uv)     { uvArr.set(g.attributes.uv.array, ui);       ui += g.attributes.uv.array.length; }
+  });
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+  if (normArr) out.setAttribute('normal', new THREE.BufferAttribute(normArr, 3));
+  if (uvArr)   out.setAttribute('uv',     new THREE.BufferAttribute(uvArr, 2));
+  return out;
+}
+
+// ── 렌더러 & 씬 ────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.35;
+renderer.sortObjects = true; // 투명 오브젝트 뒤→앞 자동 정렬 (기본값이지만 명시)
+document.body.appendChild(renderer.domElement);
+
+const scene  = new THREE.Scene();
+scene.background = new THREE.Color(0x62c0f5);
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(0, 0, 14);
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ── 환경맵 (비누거품 굴절/반사용) ──────────────────────────
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+pmrem.dispose();
+
+// ── 조명 ───────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0xd8eeff, 1.6));
+
+// 메인 키 라이트
+const dl1 = new THREE.DirectionalLight(0xffffff, 4.5);
+dl1.position.set(-6, 10, 8);
+scene.add(dl1);
+
+// 보조광
+const dl2 = new THREE.DirectionalLight(0xffcce8, 1.5);
+dl2.position.set(8, -4, 4);
+scene.add(dl2);
+
+const dl3 = new THREE.DirectionalLight(0xc8f0ff, 2.0);
+dl3.position.set(0, 5, -10);
+scene.add(dl3);
+
+// ── 반짝임 라이트 (궤도 운동 → 유리 표면 스페큘러 하이라이트) ──
+// 빛이 움직이면서 유리 표면 여러 곳에 하이라이트가 생겼다 사라짐
+const GLINT_LIGHTS = [
+  { light: new THREE.PointLight(0xffffff, 55, 32, 2), spd: 0.0055, rx: 8,  ry: 5, rz: 11, ph: 0 },
+  { light: new THREE.PointLight(0xfff0f8, 45, 28, 2), spd: 0.0038, rx: 10, ry: 6, rz: 9,  ph: 2.1 },
+  { light: new THREE.PointLight(0xf0f4ff, 45, 28, 2), spd: 0.0062, rx: 7,  ry: 7, rz: 10, ph: 4.2 },
+];
+GLINT_LIGHTS.forEach(({ light }) => scene.add(light));
+
+// ── 지오메트리 팩토리 ──────────────────────────────────────
+
+// 1. 버블 (구)
+const sphereGeo = new THREE.SphereGeometry(1, 64, 64);
+
+// 2. 별 — CatmullRom 경로를 따르는 360도 원형 튜브
+function makeStarGeo() {
+  const nPts = 5, outerR = 0.9, innerR = 0.40, tubeR = 0.28;
+  const vecs = [];
+  for (let i = 0; i < nPts * 2; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const a = (i / (nPts * 2)) * Math.PI * 2 - Math.PI / 2;
+    vecs.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, 0));
+  }
+  const curve = new THREE.CatmullRomCurve3(vecs, true, 'catmullrom', 0.5);
+  const geo = new THREE.TubeGeometry(curve, 120, tubeR, 20, true);
+  geo.center();
+  return geo;
+}
+
+// 3. 하트 — 파라메트릭 경로를 따르는 360도 원형 튜브
+function makeHeartGeo() {
+  const N = 120, tubeR = 0.22;
+  const vecs = [];
+  for (let i = 0; i < N; i++) {
+    const t = (i / N) * Math.PI * 2;
+    const px = 16 * Math.pow(Math.sin(t), 3) / 16;
+    const py = (13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)) / 14;
+    vecs.push(new THREE.Vector3(px, py, 0));
+  }
+  const curve = new THREE.CatmullRomCurve3(vecs, true);
+  const geo = new THREE.TubeGeometry(curve, 200, tubeR, 20, true);
+  geo.center();
+  return geo;
+}
+
+// 4. 곰돌이 — 구체 합치기 (바디+머리+귀+팔)
+function makeBearGeo() {
+  const body = new THREE.SphereGeometry(0.78, 32, 32);
+  const head = new THREE.SphereGeometry(0.58, 32, 32);
+  const earL = new THREE.SphereGeometry(0.23, 16, 16);
+  const earR = new THREE.SphereGeometry(0.23, 16, 16);
+  const armL = new THREE.SphereGeometry(0.21, 16, 16);
+  const armR = new THREE.SphereGeometry(0.21, 16, 16);
+
+  body.translate(0,     -0.32, 0);
+  head.translate(0,      0.62, 0);
+  earL.translate(-0.44,  1.12, 0.05);
+  earR.translate( 0.44,  1.12, 0.05);
+  armL.translate(-0.90, -0.28, 0.12);
+  armR.translate( 0.90, -0.28, 0.12);
+
+  const geo = mergeGeos([body, head, earL, earR, armL, armR]);
+  geo.center();
+  return geo;
+}
+
+// 5. 나비 — 4개 날개 돌출
+function makeButterflyGeo() {
+  const ext = {
+    depth: 0.1, bevelEnabled: true,
+    bevelThickness: 0.05, bevelSize: 0.035, bevelSegments: 4,
+  };
+
+  // 오른쪽 윗날개
+  const ruShape = new THREE.Shape();
+  ruShape.moveTo(0.07, 0.14);
+  ruShape.bezierCurveTo(0.32, 0.92, 1.32, 1.02, 1.15, 0.32);
+  ruShape.bezierCurveTo(0.98, -0.06, 0.26, 0.02, 0.07, 0.14);
+
+  // 오른쪽 아랫날개
+  const rlShape = new THREE.Shape();
+  rlShape.moveTo(0.07, -0.09);
+  rlShape.bezierCurveTo(0.24, -0.58, 1.08, -0.72, 0.90, -0.30);
+  rlShape.bezierCurveTo(0.74, -0.12, 0.24, -0.09, 0.07, -0.09);
+
+  const geoRU = new THREE.ExtrudeGeometry(ruShape, ext);
+  const geoRL = new THREE.ExtrudeGeometry(rlShape, ext);
+
+  // 좌우 대칭 복사
+  const mirror = new THREE.Matrix4().makeScale(-1, 1, 1);
+  const geoLU = geoRU.clone().applyMatrix4(mirror);
+  const geoLL = geoRL.clone().applyMatrix4(mirror);
+  geoLU.computeVertexNormals();
+  geoLL.computeVertexNormals();
+
+  const geo = mergeGeos([geoRU, geoRL, geoLU, geoLL]);
+  geo.center();
+  return geo;
+}
+
+// 6. 음표 — 머리(타원)+기둥+꼬리
+function makeMusicNoteGeo() {
+  // 음표 머리 (기울어진 타원)
+  const head = new THREE.SphereGeometry(0.52, 32, 20);
+  head.scale(1.0, 0.68, 0.82);
+  head.computeVertexNormals(); // 비균등 scale 후 노멀 재계산
+  head.rotateZ(-0.32);
+  head.translate(-0.1, -0.05, 0);
+
+  // 기둥 (얇은 원기둥)
+  const stem = new THREE.CylinderGeometry(0.072, 0.072, 1.62, 12);
+  stem.translate(0.36, 0.78, 0);
+
+  // 꼬리 (베지어 곡선)
+  const flagShape = new THREE.Shape();
+  flagShape.moveTo(0, 0);
+  flagShape.bezierCurveTo(0.85, -0.08, 0.80, 0.64, 0.46, 0.68);
+  flagShape.bezierCurveTo(0.68, 0.36, 0.74, 0.05, 0, 0.22);
+  flagShape.closePath();
+  const flag = new THREE.ExtrudeGeometry(flagShape, {
+    depth: 0.1, bevelEnabled: true,
+    bevelThickness: 0.03, bevelSize: 0.02, bevelSegments: 2,
+  });
+  flag.translate(0.36, 1.59, -0.05);
+
+  const geo = mergeGeos([head, stem, flag]);
+  geo.center();
+  return geo;
+}
+
+// 모든 지오메트리 빌드
+const GEOS = [
+  sphereGeo,          // 0: 버블
+  makeStarGeo(),      // 1: 별
+  makeHeartGeo(),     // 2: 하트
+  makeBearGeo(),      // 3: 곰돌이
+  makeButterflyGeo(), // 4: 나비
+  makeMusicNoteGeo(), // 5: 음표
+];
+
+// ── 컬러 프리셋 (그라데이션 페어: [위쪽 색, 아래쪽 색]) ────
+const COLOR_PRESETS = [
+  [new THREE.Color(1.00, 0.62, 0.84), new THREE.Color(0.98, 0.38, 0.72)], // 핑크
+  [new THREE.Color(0.55, 0.85, 1.00), new THREE.Color(0.35, 0.68, 0.98)], // 하늘색
+  [new THREE.Color(0.80, 0.55, 1.00), new THREE.Color(0.60, 0.30, 0.96)], // 보라
+  [new THREE.Color(0.55, 0.98, 0.84), new THREE.Color(0.35, 0.88, 0.72)], // 민트
+  [new THREE.Color(1.00, 0.74, 0.50), new THREE.Color(1.00, 0.52, 0.40)], // 피치
+  [new THREE.Color(0.70, 0.68, 1.00), new THREE.Color(0.80, 0.48, 0.98)], // 라벤더
+  [new THREE.Color(1.00, 0.55, 0.82), new THREE.Color(0.72, 0.38, 0.98)], // 핑크→보라
+  [new THREE.Color(0.44, 0.88, 1.00), new THREE.Color(0.60, 0.65, 0.98)], // 하늘→라벤더
+  [new THREE.Color(1.00, 0.85, 0.60), new THREE.Color(1.00, 0.62, 0.84)], // 옐로→핑크
+  [new THREE.Color(0.62, 1.00, 0.90), new THREE.Color(0.42, 0.78, 1.00)], // 민트→하늘
+];
+
+// Y축 기준 버텍스 컬러 그라데이션 (지오메트리 복제 후 color 속성 추가)
+function addVertexColors(baseGeo, colorTop, colorBottom) {
+  const geo = baseGeo.clone();
+  const pos = geo.attributes.position;
+  let minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const range = maxY - minY || 1;
+  const col = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const t = (pos.getY(i) - minY) / range; // 0=아래, 1=위
+    col[i*3]   = colorBottom.r + (colorTop.r - colorBottom.r) * t;
+    col[i*3+1] = colorBottom.g + (colorTop.g - colorBottom.g) * t;
+    col[i*3+2] = colorBottom.b + (colorTop.b - colorBottom.b) * t;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return geo;
+}
+
+// ── 버블 재질 ──────────────────────────────────────────────
+// transmission + thickness = 빛이 유리 속을 통과하는 진짜 버블/크리스탈 느낌
+function makeMat(solid = false) {
+  return new THREE.MeshPhysicalMaterial({
+    vertexColors:              true,
+    transparent:               true,
+    opacity:                   0.92,
+    depthWrite:                solid,
+    transmission:              0.90,         // 핵심: 빛 투과 굴절 → 버블 느낌
+    roughness:                 0.0,
+    metalness:                 0,
+    ior:                       1.45,         // 비누거품 굴절률
+    thickness:                 1.8,          // 유리 두께 → 색 흡수·깊이감
+    attenuationDistance:       3.0,
+    attenuationColor:          new THREE.Color(0.88, 0.94, 1.0),
+    envMapIntensity:           3.5,
+    clearcoat:                 1.0,          // 표면 광택 → 밝은 하이라이트
+    clearcoatRoughness:        0.0,
+    iridescence:               1.0,          // 무지개빛 얇은 막
+    iridescenceIOR:            1.38,
+    iridescenceThicknessRange: [100, 800],   // 핑크~파랑~보라 넓은 무지개
+    side:                      solid ? THREE.FrontSide : THREE.DoubleSide,
+  });
+}
+
+// type 1(별) 2(하트) 3(곰돌이) 5(음표) → depthWrite 활성화
+const SOLID_TYPES = new Set([1, 2, 3, 5]);
+
+// ── 오브젝트 클래스 ────────────────────────────────────────
+const TYPE_POOL = [0, 0, 1, 2, 3, 4, 5];
+
+class GObj {
+  constructor(wx, wy) {
+    const type   = TYPE_POOL[Math.floor(Math.random() * TYPE_POOL.length)];
+    const preset = COLOR_PRESETS[Math.floor(Math.random() * COLOR_PRESETS.length)];
+    const scale  = Math.random() * .58 + .40;
+
+    this.geo  = addVertexColors(GEOS[type], preset[0], preset[1]);
+    this.mesh = new THREE.Mesh(this.geo, makeMat(SOLID_TYPES.has(type)));
+    this.mesh.scale.setScalar(scale);
+    this.mesh.rotation.set(
+      Math.random() * Math.PI * 2,
+      Math.random() * Math.PI * 2,
+      Math.random() * Math.PI * 2
+    );
+
+    if (wx !== undefined) {
+      this.mesh.position.set(wx, wy, (Math.random() - .5) * 5);
+    } else {
+      this.mesh.position.set(
+        (Math.random() - .5) * 20,
+        -12 - Math.random() * 4,
+        (Math.random() - .5) * 5
+      );
+    }
+
+    this.vy = Math.random() * .014 + .005;
+    this.vx = (Math.random() - .5) * .004;
+    this.wo = Math.random() * Math.PI * 2;
+    this.ws = Math.random() * .016 + .005;
+    this.rx = (Math.random() - .5) * .006;
+    this.ry = (Math.random() - .5) * .006;
+    this.rz = (Math.random() - .5) * .003;
+
+    scene.add(this.mesh);
+  }
+
+  update() {
+    this.wo += this.ws;
+    this.mesh.position.x += this.vx + Math.sin(this.wo) * .013;
+    this.mesh.position.y += this.vy;
+    this.mesh.rotation.x += this.rx;
+    this.mesh.rotation.y += this.ry;
+    this.mesh.rotation.z += this.rz;
+  }
+
+  isOff() { return this.mesh.position.y > 14; }
+
+  dispose() {
+    scene.remove(this.mesh);
+    this.geo.dispose();
+    this.mesh.material.dispose();
+  }
+}
+
+// ── 마우스 & 클릭 ──────────────────────────────────────────
+const mouse     = { x: 0, y: 0 };
+const mouseLerp = { x: 0, y: 0 };
+
+window.addEventListener('mousemove', e => {
+  mouse.x =  (e.clientX / innerWidth)  * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+});
+
+const raycaster  = new THREE.Raycaster();
+const clickPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+
+renderer.domElement.addEventListener('click', e => {
+  const ndc = new THREE.Vector2(
+    (e.clientX / innerWidth)  * 2 - 1,
+    -(e.clientY / innerHeight) * 2 + 1
+  );
+  raycaster.setFromCamera(ndc, camera);
+  const target = new THREE.Vector3();
+  raycaster.ray.intersectPlane(clickPlane, target);
+
+  for (let i = 0; i < 3; i++) {
+    objs.push(new GObj(
+      target.x + (Math.random() - .5) * 3.5,
+      target.y + (Math.random() - .5) * 3.5
+    ));
+  }
+});
+
+// ── 초기 오브젝트 배치 ─────────────────────────────────────
+let objs  = [];
+let frame = 0;
+
+for (let i = 0; i < 12; i++) {
+  const o = new GObj();
+  o.mesh.position.y = (Math.random() - .5) * 20;
+  objs.push(o);
+}
+
+// ── 애니메이션 루프 ────────────────────────────────────────
+function animate() {
+  frame++;
+  requestAnimationFrame(animate);
+
+  // 마우스 시점 패럴랙스
+  mouseLerp.x += (mouse.x - mouseLerp.x) * .04;
+  mouseLerp.y += (mouse.y - mouseLerp.y) * .04;
+  camera.position.x += (mouseLerp.x * 1.5 - camera.position.x) * .05;
+  camera.position.y += (mouseLerp.y * 1.0 - camera.position.y) * .05;
+  camera.lookAt(0, 0, 0);
+
+  // 반짝임 라이트 궤도 운동 → 유리 표면에 스페큘러 핫스팟 이동
+  const t = frame * 0.01;
+  GLINT_LIGHTS.forEach(({ light, spd, rx, ry, rz, ph }) => {
+    const ft = frame * spd + ph;
+    light.position.set(
+      Math.cos(ft)        * rx,
+      Math.sin(ft * 0.7)  * ry,
+      Math.cos(ft * 0.5)  * rz * 0.4 + 9   // 항상 카메라 쪽 앞에 위치
+    );
+  });
+
+  // 오브젝트 업데이트
+  for (let i = objs.length - 1; i >= 0; i--) {
+    objs[i].update();
+    if (objs[i].isOff()) {
+      objs[i].dispose();
+      objs.splice(i, 1);
+    }
+  }
+
+  if (frame % 150 === 0 && objs.length < 16) objs.push(new GObj());
+
+  renderer.render(scene, camera);
+}
+
+animate();
+</script>
+</body>
+</html>
